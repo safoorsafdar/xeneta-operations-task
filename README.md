@@ -1,52 +1,21 @@
 # Practical section
-
-## Premise
-
-Provided are two simplified parts of the same application environment: A database dump and an API service. Your task is to automate setting up the development environment in a reliable and testable manner using "infrastructure as code" principles.
-
-The goal is to end up with a limited set of commands that would install the different environments and run them using containers. You can use any software that you find suitable for the task. The code should come with instructions on how to run it and deploy it to arbitrary targets; whether it is deployed locally, towards physical machines, or towards virtual nodes in the cloud.
-
-## Running the database
-
-There’s an SQL dump in `db/rates.sql` that needs to be loaded into a PostgreSQL 9.6 database.
-
-After installing the database, the data can be imported through:
-
-```
-createdb rates
-psql -h localhost -U postgres < db/rates.sql
-```
-
-You can verify that the database is running through:
-
-```
-psql -h localhost -U postgres -c "SELECT 'alive'"
-```
-
-The output should be something like:
-
-```
- ?column?
-----------
- alive
-(1 row)
-```
-
 ## Running the API service
 
-Start from the `rates` folder.
+Start from the root folder.
 
 ### 1. Install prerequisites
-
-```
-DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y python-pip
-pip install -U gunicorn
-pip install -Ur requirements.txt
-```
+* Docker
+* Doker Compose
 
 ### 2. Run the application
 ```
-gunicorn -b :3000 wsgi
+docker-compose up --build --force-recreate
+```
+Note: it will also start the database service for the rates application with default defined `.sql` file from `db` folder.
+
+### 3. Tear Down
+```
+docker-compose down --volume
 ```
 
 The API should now be running on [http://localhost:3000](http://localhost:3000).
@@ -77,19 +46,6 @@ The output should be something like this:
 }
 ```
 
-
-## Extra details
-
-* **Provide the solution as a public git repository that can easily be cloned by our development team.**
-
-* The configuration file `rates/config.py` has some defaults that will most likely change depending on the solution. It would be beneficial to have a way of more dynamically pass in config values.
-
-* List and describe the tool(s) used, and why they were chosen for the task.
-
-* Provide any instructions needed to run the automation solution in `README.md`.
-
-* If you have any questions, please don't hesitate to contact us at tech-recruitment@xeneta.com
-
 # Theoretical section
 In this section we are seeking high-level answers, use a maximum of couple of paragraphs to answer the questions.
 
@@ -102,8 +58,25 @@ Both the incoming data updates and requests for data can be highly sporadic - th
 High availability is a strict requirement from the customers.
 
 * How would you design the system?
+### Single Point of failure
+One of the foundations of high availability is eliminating single points of failure by achieving redundancy on all levels. A single point of failure is any component of the system which would cause the rest of the system to fail if that individual component failed. We can use 2N+1 model, which provides the same level of availability and redundancy as 2N with the addition of another component for improved protection. 
+
+ ### Data Backup and recovery
+A high availablity system mush have sound data protection and DR plans. An absolute must is to have proper backups. Another critical thing is the ability to recover in case of a data loss quickly, corruption, or complete storage failure.
+
+### Failover with failure detection
+In a highly available, redundant IT infrastructure, the system needs to instantly redirect requests to a backup system in case of a failure. This is called failover. Early failure detections are essential for improving failover times and ensuring maximum systems availability.
+
+### Observability
+Observability is tooling or  techinal solution that allows teams to actively debug their system. Observability is based on exploring properties and patterns not defined in advance. Good observability can contain monitoring and logging of the system.
+
+### Chaos Engineering
+Chaos Engineering is the discipline of experimenting on a system in order to build confidence in the system’s capability to withstand turbulent conditions in production.
+
 * How would you set up monitoring to identify bottlenecks as the load grows?
+> The most common strategy for failure monitoring and detection on redundant systems is this top-to-bottom technique. Implementing the observability can help to track bottlenecks in the systems by collecting system logs into i.e. ELK stack and monitoring the system on all layeres such as application, database and infrasturcture.
 * How can those bottlenecks be addressed in the future?
+> Addressing bottleneck issues usually results in returning the system to operable performance levels; however, fixing bottleneck issues requires first identifying the underperforming component. Observability and Chaos engineering can help to identify some bottlenecks in advance. Bottleneck resolution would depends on issue itself.
 
 Provide a high-level diagram, along with a paragraphs describing the choices you've made and what factors do you need to take into consideration.
 
@@ -112,12 +85,16 @@ Provide a high-level diagram, along with a paragraphs describing the choices you
 Here are a few possible scenarios where the system requirements change or the new functionality is required:
 
 1. The batch updates have started to become very large, but the requirements for their processing time are strict.
+> We can utilize pg_dump over COPY to process large data in various chunk and asynchronous execution to decrease over execution time and have queue mechanism to deal with task execution.
 
 2. Code updates need to be pushed out frequently. This needs to be done without the risk of stopping a data update already being processed, nor a data response being lost.
+> We can have various deployment stratagey in place to deploy new releases such as Blue/Green to insure that new release are functional before deleting old release or old running application.
 
 3. For development and staging purposes, you need to start up a number of scaled-down versions of the system.
+> If we are on containerize environment or monolith environment, we can have IAC in place to replicate application and infrastructure for various environment. and to ensure each environment have similar database schema, we can have migration and dummy data seeds to have up to date database schema with data.
 
 Please address *at least* one of the situations. Please describe:
 
 - Which parts of the system are the bottlenecks or problems that might make it incompatible with the new requirements?
+> Bulk updates of database may become bottleneck when the system grows, for HA/Active/Passive DB cluster, replication and availability of data across nodes may become troublant. 
 - How would you restructure and scale the system to address those?
